@@ -165,5 +165,6 @@ doc/
 logs/
 test/
 output/
+images/
 .env
 
