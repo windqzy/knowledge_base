@@ -266,7 +266,7 @@ def enrich_markdown_images(state: ImportGraphState) -> ImportGraphState:
     # 8.更新state
     #8.1 更新state md_content md_path_obj
     state['md_content'] = new_md_content
-    state['md_path_obj'] = new_md_path_obj
+    state['md_path'] = new_md_path_obj
     #8.2返回state
     return state
 
