@@ -166,5 +166,7 @@ logs/
 test/
 output/
 images/
+notes/
+volumes/
 .env
 
