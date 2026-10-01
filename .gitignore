@@ -163,7 +163,6 @@ cython_debug/
 #.idea/
 doc/
 logs/
-test/
 output/
 images/
 notes/
