@@ -7,11 +7,11 @@ from app.api.schemas.query_shema import AsyncQueryResponseSchema, SyncQueryRespo
 from app.api.schemas.query_shema import QueryRequestSchema
 
 from app.shared.runtime.logger import logger,PROJECT_ROOT
-from app.shared.utils.sse_utils import sse_generator
+from app.shared.utils.sse_utils import sse_generator, push_to_session, SSEEvent
 from datetime import datetime
 from mimetypes import guess_type
 from app.shared.utils.task_utils import get_done_task_list, update_task_status, TASK_STATUS_PROCESSING, \
-    TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
+    TASK_STATUS_COMPLETED, TASK_STATUS_FAILED, clear_task
 
 from app.process.query.agent.state import QueryGraphState,create_query_default_state
 from app.process.query.agent.main_graph import query_graph_app
@@ -65,11 +65,26 @@ def invoke_query_graph(original_query:str,session_id:str,is_stream:bool):
         # 2. 调用图对象
         result = query_graph_app.invoke(state)
         update_task_status(session_id, TASK_STATUS_COMPLETED, is_stream)
+
+        # 流式 + 正常结束
+        if is_stream:
+            push_to_session(
+                session_id,
+                SSEEvent.FINAL,
+                {
+                    "answer": result.get("answer"),
+                    "status": "completed",
+                    "image_urls": result.get("image_urls", [])
+                }
+            )
+
         logger.info(f"测试结束查询图流程,查询结果为:\n {json.dumps(result, indent=4, ensure_ascii=False)}")
         return result
     except Exception as e:
         logger.exception(f"查询图执行出现错误!{e}")
         update_task_status(session_id, TASK_STATUS_FAILED, is_stream)
+        push_to_session(session_id, SSEEvent.ERROR, data={"error": f"查询:{original_query}流程报错!错误信息:{str(e)}"})
+
 
 # 接口4: 查询问题接口
 @app.post("/query")
@@ -81,6 +96,8 @@ def query_question(task:BackgroundTasks,param:QueryRequestSchema):
     # 2.判断是不是流式
     if is_stream:
         # 创建一个队列
+        # 清空之前的session_id对应的列表 避免重复添加队列之前的列表信息
+        clear_task(session_id)
         create_sse_queue(session_id)
         task.add_task(invoke_query_graph,is_stream=is_stream,original_query=query,session_id=session_id)
         # 3.流式的异步执行
